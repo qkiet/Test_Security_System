@@ -54,6 +54,7 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+extern int ProcessCommand(uint8_t* command, uint16_t command_length);
 
 /* USER CODE END EFP */
 

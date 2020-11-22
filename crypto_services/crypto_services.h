@@ -12,6 +12,7 @@
 
 #include "main.h"
 #include <stdbool.h>
+#include "network_services.h"
 #if !(WJ_ENCRYPT)
 #include "../CryptoLib/Inc/crypto.h"
 #else
@@ -22,11 +23,12 @@
 #include <stdbool.h>
 #endif
 
-#define PASSWORD_LENGTH 10
+#define PASSWORD_LENGTH 20
 #define SECRET_KEY_SIZE SHA256_HASH_SIZE
-#define RANDOM_AUTHENTICATE_NUMBER_SIZE (128 / 8)
+#define RANDOM_AUTHENTICATE_NUMBER_SIZE ( 128 / 8 )
 #define HMAC_SIZE SHA256_HASH_SIZE
 #define MAXIMUM_MESSAGE_SIZE 1024
+#define ENCRYPT_KEY_SIZE AES_KEY_SIZE_128
 /*************************
  * Declare all interface *
  *************************/
@@ -60,9 +62,20 @@ extern int CompareHMAC_SHA256(uint8_t* message, uint16_t message_length, uint8_t
  * @param output_size: desired length of output buffer[in]
  * @param is_hmac: Append HMAC if set to true 				[in]
  * @param is_encrypt: Encrypt output if set to true 	[in]
+ * @param command_id: command id of this payload			[in]
  * @param result: pointer to output buffer 						[out]
  */
-extern void PrepareSendingBuffer(const void* key, int keylen, const void* iv, uint8_t* data, uint16_t datalen, uint16_t output_size, bool is_hmac, bool is_encrypt, uint8_t* result);
+extern void PrepareSendingBuffer(
+		const void* key,
+		int keylen,
+		const void* iv,
+		uint8_t* data,
+		uint16_t datalen,
+		uint16_t output_size,
+		bool is_hmac,
+		bool is_encrypt,
+		uint16_t command_id,
+		uint8_t* result);
 
 
 
@@ -92,4 +105,13 @@ extern int32_t Encrypt(uint8_t* plaintext, uint32_t plaintext_len, uint8_t* AES_
  * @retval number of decrypted bytes
  */
 extern int32_t Decrypt(uint8_t* ciphertext, uint16_t ciphertext_len, uint8_t* AES_key, uint8_t* AES_IV, uint8_t* decrypted_text);
+
+/**
+ * Update encrypted key by get first 128-bit of SHA256 (secret key || encrypt key || hint number)
+ * @param secret_key: pointer to secret key		[in]
+ * @param hint_number: pointer to hint number [in]
+ * @param encrypt_key: pointer to encrypt key [in,out]
+ */
+extern void UpdateEncryptKey(uint8_t *secret_key, uint8_t *hint_number, uint8_t *encrypt_key);
+
 #endif /* CRYPTO_SERVICES_H_ */

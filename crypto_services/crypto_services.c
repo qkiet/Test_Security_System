@@ -11,6 +11,11 @@
 
 extern RNG_HandleTypeDef hrng;
 
+/************************
+ * Declare private APIs *
+ ************************/
+static void PaddingNull(uint8_t* buffer_in_out, uint16_t input_length, uint16_t output_length);
+
 /***************************
  * Implement all interface *
  ***************************/
@@ -135,7 +140,7 @@ int32_t Decrypt(uint8_t* ciphertext, uint16_t ciphertext_len, uint8_t* AES_key, 
 
 
 static void ArrayXOR(uint8_t* array1, uint8_t* array2, uint16_t length, uint8_t* output_array);
-static void PaddingISO(uint8_t* buffer_in_out, uint16_t input_length, uint16_t output_length);
+static void PaddingnNull(uint8_t* buffer_in_out, uint16_t input_length, uint16_t output_length);
 
 /************************
  * Define public APIs *
@@ -185,19 +190,31 @@ void RNGBigNumber(uint16_t size_in_byte, uint8_t* output_buffer)
  * @param output_size: desired length of output buffer[in]
  * @param is_hmac: Append HMAC if set to true 				[in]
  * @param is_encrypt: Encrypt output if set to true 	[in]
+ * @param command_id: command id of this payload			[in]
  * @param result: pointer to output buffer 						[out]
  */
-void PrepareSendingBuffer(const void* key, int keylen, const void* iv, uint8_t* data, uint16_t datalen, uint16_t output_size, bool is_hmac, bool is_encrypt, uint8_t* result)
+void PrepareSendingBuffer(
+		const void* key,
+		int keylen,
+		const void* iv,
+		uint8_t* data,
+		uint16_t datalen,
+		uint16_t output_size,
+		bool is_hmac,
+		bool is_encrypt,
+		uint16_t command_id,
+		uint8_t* result)
 {
     uint8_t temp_buff[1060];
     memcpy((void*)result, data, datalen);
     //First, append payload length
     memcpy((void*)temp_buff, result, datalen);
     memcpy(result, &datalen, sizeof(datalen));
-    memcpy(result + 2, temp_buff, datalen);
+    memcpy(result + MESSAGE_LENGTH_HEADER_SIZE, &command_id, sizeof(command_id));
+    memcpy(result + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE, temp_buff, datalen);
 
     //Second, padding with ISO 7816 padding scheme
-    PaddingISO(result, result + 2, output_size);
+    PaddingNull(result, datalen + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE, output_size);
 
     //Then it encrypt
     if (is_encrypt)
@@ -312,6 +329,42 @@ void CreateHMAC_SHA256(uint8_t* message, uint16_t message_length, uint8_t* key, 
 	Sha256Calculate(outer_hashed_key, padding_size + SHA256_HASH_SIZE, output_HMAC);
 }
 
+/**
+ * Update encrypted key by get first 128-bit of SHA256 (secret key || encrypt key || hint number)
+ * @param secret_key: pointer to secret key		[in]
+ * @param hint_number: pointer to hint number [in]
+ * @param encrypt_key: pointer to encrypt key [in,out]
+ */
+void UpdateEncryptKey(uint8_t *secret_key, uint8_t *hint_number, uint8_t *encrypt_key)
+{
+	uint8_t temp_buff[SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE + RANDOM_AUTHENTICATE_NUMBER_SIZE];
+	SHA256_HASH sha256_digest;
+	memcpy(temp_buff, secret_key , SECRET_KEY_SIZE);
+	memcpy(temp_buff + SECRET_KEY_SIZE, encrypt_key, ENCRYPT_KEY_SIZE);
+	memcpy(temp_buff + SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE, hint_number, RANDOM_AUTHENTICATE_NUMBER_SIZE);
+	Sha256Calculate(temp_buff, SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE + RANDOM_AUTHENTICATE_NUMBER_SIZE, &sha256_digest);
+	memcpy(encrypt_key, sha256_digest.bytes, ENCRYPT_KEY_SIZE);
+}
+
+/**
+ * Update encrypted key and backup key from SHA512 digest of (secret key || back up key || hint number)
+ * @param secret_key: pointer to secret key									[in]
+ * @param reset_key_hint: pointer to reset key hint number 	[in]
+ * @param backup_key: pointer to back up key								[in, out]
+ * @param encrypt_key: pointer to encrypt key								[in, out]
+ */
+void ResetKeyUpdate(uint8_t *secret_key, uint8_t *reset_key_hint, uint8_t *backup_key, uint8_t *encrypt_key)
+{
+	uint8_t temp_buff[SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE + RANDOM_AUTHENTICATE_NUMBER_SIZE];
+	SHA512_HASH sha512_digest;
+	memcpy(temp_buff, secret_key , SECRET_KEY_SIZE);
+	memcpy(temp_buff + SECRET_KEY_SIZE, backup_key, ENCRYPT_KEY_SIZE);
+	memcpy(temp_buff + SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE, reset_key_hint, RANDOM_AUTHENTICATE_NUMBER_SIZE);
+	Sha512Calculate(temp_buff, SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE + RANDOM_AUTHENTICATE_NUMBER_SIZE, &sha512_digest);
+	memcpy(encrypt_key, sha512_digest.bytes, ENCRYPT_KEY_SIZE);
+	memcpy(backup_key, sha512_digest.bytes + ENCRYPT_KEY_SIZE, ENCRYPT_KEY_SIZE);
+}
+
 /************************
  * Define private APIs *
  ************************/
@@ -324,7 +377,7 @@ static void ArrayXOR(uint8_t* array1, uint8_t* array2, uint16_t length, uint8_t*
 	}
 }
 
-static void PaddingISO(uint8_t* buffer_in_out, uint16_t input_length, uint16_t output_length)
+static void PaddingNull(uint8_t* buffer_in_out, uint16_t input_length, uint16_t output_length)
 {
     for (int i = input_length; i < output_length; i++)
     {
