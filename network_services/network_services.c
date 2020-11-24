@@ -38,7 +38,7 @@ void InitSecuredNetworkService()
   memcpy(secret_key, hashed_salted_password.bytes, SHA256_HASH_SIZE);
 }
 
-void RunSession(int accepted_conn)
+void RunSecuredSession(int accepted_conn)
 {
 	uint8_t send_buff[1060],
 					receive_buff[1060],
@@ -256,6 +256,7 @@ SESSION_BEGIN:
 					uint8_t reset_key_hint[RANDOM_AUTHENTICATE_NUMBER_SIZE];
 					RNGBigNumber(RANDOM_AUTHENTICATE_NUMBER_SIZE, reset_key_hint);
 					memcpy(response_to_GUI, reset_key_hint, RANDOM_AUTHENTICATE_NUMBER_SIZE);
+
 					snprintf((char*)(response_to_GUI + RANDOM_AUTHENTICATE_NUMBER_SIZE), 3, "OK");
 					response_length = RANDOM_AUTHENTICATE_NUMBER_SIZE + 2;
 
@@ -382,4 +383,145 @@ SESSION_END:
 //	}
 
 
+}
+
+void RunUnsecuredSession(int accepted_conn)
+{
+	uint8_t send_buff[1060],
+					receive_buff[1060],
+					temp_buff[1060],
+					cached_response[1060],
+					response_to_GUI[1060],
+					secret_random_concate[48],
+					session_encrypt_key[AES_KEY_SIZE_128],
+					session_old_encrypt_key[AES_KEY_SIZE_128],
+					session_encrypt_iv[AES_CTR_IV_SIZE],
+					session_backup_key[AES_KEY_SIZE_128],
+					random_authenticate_number[RANDOM_AUTHENTICATE_NUMBER_SIZE],
+					next_encrypt_key_hint[RANDOM_AUTHENTICATE_NUMBER_SIZE];
+	uint16_t 	received_command_length,
+						cached_response_length,
+						//Store information about response buffer size
+						response_length,
+						expected_command_id = 0,
+						received_command_id,
+
+						sending_command_id;
+
+	SHA256_HASH sha256_digest;
+	bool is_wait_for_resend = false;
+	int status;
+
+  struct timeval send_timeout =
+  {
+  		15, //seconds
+			800000, // miliseconds
+  };
+  struct timeval receive_timeout =
+  {
+  		15,
+			800000, //800 miliseconds
+  };
+  setsockopt(accepted_conn, SOL_SOCKET, SO_SNDTIMEO, (const char*)&send_timeout, sizeof(send_timeout));
+  setsockopt(accepted_conn, SOL_SOCKET, SO_RCVTIMEO, (const char*)&receive_timeout, sizeof(receive_timeout));
+	uint16_t message_size;
+
+
+	//Wait for Authentication Phase from GUI
+	status = read(accepted_conn, receive_buff, 64);
+
+	message_size = (uint16_t)*(receive_buff + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE + strlen("REQUEST"));
+	snprintf((char*)temp_buff, 4, "ACK");
+
+	PrepareSendingBuffer(
+			NULL,
+			0,
+			NULL,
+			temp_buff,
+			strlen("ACK"),
+			message_size,
+			false,
+			false,
+			expected_command_id,
+			send_buff);
+
+	if (write(accepted_conn, send_buff, message_size) != message_size)
+	{
+		return;
+	}
+
+	//After this, it begin session
+	while (1)
+	{
+
+		if (read(accepted_conn, receive_buff, message_size) == message_size)
+		{
+			response_length = 0;
+
+			received_command_length = (uint16_t)*(receive_buff);
+			received_command_id = (uint16_t)*(receive_buff + MESSAGE_LENGTH_HEADER_SIZE);
+
+			//command id equal to expected command id
+			if (received_command_id == expected_command_id)
+			{
+				//Send back to GUI along with next_encrypt_key_hint
+				status = ProcessCommand(receive_buff + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE, received_command_length);
+				if (status == 1)
+				{
+					snprintf((char*)(response_to_GUI), 19, "LED_1: %d; LED_2: %d", HAL_GPIO_ReadPin(LED_1_GPIO_Port, LED_1_Pin), HAL_GPIO_ReadPin(LED_2_GPIO_Port, LED_2_Pin));
+					response_length += 18;
+					cached_response_length = 18;
+					sending_command_id = expected_command_id;
+					expected_command_id++;
+					memcpy(cached_response, response_to_GUI, cached_response_length);
+				}
+				else if (status == 0)
+				{
+					snprintf((char*)(response_to_GUI), 4, "ACK");
+					response_length += 3;
+					cached_response_length = 3;
+					sending_command_id = expected_command_id;
+					expected_command_id++;
+					memcpy(cached_response, response_to_GUI, cached_response_length);
+				}
+				//Invalid command
+				else
+				{
+					snprintf((char*)(response_to_GUI), 4, "NAK");
+					response_length += 3;
+					sending_command_id = expected_command_id;
+				}
+			}
+
+			//Send cached response when GUI resend command
+			else if (received_command_id < expected_command_id)
+			{
+				memcpy(response_to_GUI, cached_response, cached_response_length);
+				sending_command_id = expected_command_id;
+			}
+
+			PrepareSendingBuffer(
+					NULL,
+					0,
+					NULL,
+					response_to_GUI,
+					response_length,
+					message_size,
+					false,
+					false,
+					sending_command_id,
+					send_buff);
+			if (write(accepted_conn, send_buff, message_size) != message_size)
+			{
+				return;
+			}
+
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	//End of session
 }

@@ -18,6 +18,6 @@
 #define TYPE_PAYLOAD_RESEND 0x01
 
 extern void InitSecuredNetworkService();
-extern void RunSession(int accepted_conn);
+extern void RunSecuredSession(int accepted_conn);
 
 #endif /* NETWORK_SERVICES_H_ */

@@ -370,7 +370,7 @@ static void Thread_TestService(void const * argument)
   while (1)
 	{
 		newconn = accept(sock, (struct sockaddr *)&remotehost, (socklen_t *)&size);
-		RunSession(newconn);
+		RunUnsecuredSession(newconn);
 		close(newconn);
 	}
 }
