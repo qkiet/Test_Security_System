@@ -59,6 +59,10 @@ extern int ProcessCommand(uint8_t* command, uint16_t command_length);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define IS_CORRUPTED_BUTTON_Pin GPIO_PIN_7
+#define IS_CORRUPTED_BUTTON_GPIO_Port GPIOB
+#define SEC_UNSEC_BUTTON_Pin GPIO_PIN_9
+#define SEC_UNSEC_BUTTON_GPIO_Port GPIOB
 #define LED_1_Pin GPIO_PIN_0
 #define LED_1_GPIO_Port GPIOE
 #define LED_2_Pin GPIO_PIN_1

@@ -241,6 +241,12 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, LED_1_Pin|LED_2_Pin, GPIO_PIN_RESET);
 
+  /*Configure GPIO pins : IS_CORRUPTED_BUTTON_Pin SEC_UNSEC_BUTTON_Pin */
+  GPIO_InitStruct.Pin = IS_CORRUPTED_BUTTON_Pin|SEC_UNSEC_BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
   /*Configure GPIO pins : LED_1_Pin LED_2_Pin */
   GPIO_InitStruct.Pin = LED_1_Pin|LED_2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -370,7 +376,14 @@ static void Thread_TestService(void const * argument)
   while (1)
 	{
 		newconn = accept(sock, (struct sockaddr *)&remotehost, (socklen_t *)&size);
-		RunUnsecuredSession(newconn);
+		if (HAL_GPIO_ReadPin(SEC_UNSEC_BUTTON_GPIO_Port, SEC_UNSEC_BUTTON_Pin) == SET)
+		{
+			RunSecuredSession(newconn);
+		}
+		else
+		{
+			RunUnsecuredSession(newconn);
+		}
 		close(newconn);
 	}
 }

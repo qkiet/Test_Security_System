@@ -56,6 +56,7 @@ void RunSecuredSession(int accepted_conn)
 	SHA256_HASH sha256_digest;
 	bool is_wait_for_resend = false;
 	int status;
+	uint8_t remain_allowed_corrupt_message = 1;
 
   struct timeval send_timeout =
   {
@@ -228,6 +229,12 @@ SESSION_BEGIN:
 						true,
 						sending_command_id,
 						send_buff);
+
+				if ((HAL_GPIO_ReadPin(IS_CORRUPTED_BUTTON_GPIO_Port, IS_CORRUPTED_BUTTON_Pin) == GPIO_PIN_SET) && (remain_allowed_corrupt_message > 0))
+				{
+					send_buff[0] = !send_buff[0];
+					remain_allowed_corrupt_message--;
+				}
 				status = write(accepted_conn, send_buff, message_size + HMAC_SIZE);
 				//Connection problem, close connection now
 				if (IS_ERROR(status))
@@ -246,7 +253,7 @@ SESSION_BEGIN:
 					sha256_digest))
 			{
 				//Decrypt payload
-				Encrypt(send_buff + HMAC_SIZE, message_size, session_old_encrypt_key, session_encrypt_iv, temp_buff);
+				Encrypt(receive_buff + HMAC_SIZE, message_size, session_backup_key, session_encrypt_iv, temp_buff);
 
 				//Check if this really is Reset Key Routine Request from GUI
 				if (strncmp((char*)(temp_buff + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE), "ResetKey", 8) == 0)
@@ -272,6 +279,13 @@ SESSION_BEGIN:
 							true,
 							TYPE_PAYLOAD_NORMAL,
 							send_buff);
+
+					if ((HAL_GPIO_ReadPin(IS_CORRUPTED_BUTTON_GPIO_Port, IS_CORRUPTED_BUTTON_Pin) == GPIO_PIN_SET) && (remain_allowed_corrupt_message > 0))
+					{
+						send_buff[0] = !send_buff[0];
+						remain_allowed_corrupt_message--;
+					}
+
 					status = write(accepted_conn, send_buff, message_size + HMAC_SIZE);
 					//Connection problem, close connection now
 					if (IS_ERROR(status))
@@ -305,6 +319,13 @@ SESSION_BEGIN:
 						true,
 						TYPE_PAYLOAD_NORMAL,
 						send_buff);
+
+				if ((HAL_GPIO_ReadPin(IS_CORRUPTED_BUTTON_GPIO_Port, IS_CORRUPTED_BUTTON_Pin) == GPIO_PIN_SET) && (remain_allowed_corrupt_message > 0))
+				{
+					send_buff[0] = !send_buff[0];
+					remain_allowed_corrupt_message--;
+				}
+
 				status = write(accepted_conn, send_buff, message_size + HMAC_SIZE);
 				//Connection problem, close connection now
 				if (IS_ERROR(status))
@@ -322,66 +343,8 @@ SESSION_BEGIN:
 	}
 
 
-
 SESSION_END:
 	return;
-
-
-
-//	err_t recv_err;
-//	uint16_t real_message_size;
-//	uint8_t sending_ciphertext[1024];
-//
-//	uint8_t decrypted_buff[1024];
-//	struct netbuf *receive_netbuf;
-//	switch (message_size)
-//	{
-//	case 0:
-//		real_message_size = 64;
-//		break;
-//	case 1:
-//		real_message_size = 256;
-//		break;
-//	default:
-//		real_message_size = 1024;
-//	}
-//	while (1)
-//	{
-//
-//		recv_err = netconn_recv(received_conn, &receive_netbuf);
-//
-//		//If receive data successfully
-//		if (recv_err == ERR_OK)
-//		{
-//
-//			netbuf_copy(receive_netbuf, receive_buff, real_message_size);
-//			netbuf_delete(receive_netbuf);
-//			if (is_encrypted)
-//			{
-//				Decrypt(receive_buff, real_message_size, cipher_key, cipher_IV, decrypted_buff);
-//
-//			  Encrypt(sending_to_client, real_message_size, cipher_key, cipher_IV, sending_ciphertext);
-//				if (netconn_write(received_conn, sending_ciphertext, real_message_size, NETCONN_COPY) != ERR_OK)
-//				{
-//					break;
-//				}
-//			}
-//			else
-//			{
-//				if (netconn_write(received_conn, sending_to_client, real_message_size, NETCONN_COPY) != ERR_OK)
-//				{
-//					break;
-//				}
-//			}
-//
-//		}
-//		//Close fin
-//		else
-//		{
-//			break;
-//		}
-//	}
-
 
 }
 
