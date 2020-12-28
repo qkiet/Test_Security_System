@@ -20,6 +20,7 @@
 #include "WjCryptLib_AesCtr.h"
 #include "WjCryptLib_Sha256.h"
 #include "WjCryptLib_Sha512.h"
+#include "WjCryptLib_Md5.h"
 #include <stdbool.h>
 #endif
 

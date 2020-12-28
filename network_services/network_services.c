@@ -89,7 +89,9 @@ void RunSecuredSession(int accepted_conn)
 			if (strncmp((char*)(receive_buff + SHA256_HASH_SIZE + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE), "REQUEST", 7) == 0)
 			{
 				//Get message size in REQUEST message
-				message_size = (uint16_t)*(receive_buff + SHA256_HASH_SIZE + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE + strlen("REQUEST"));
+				message_size = receive_buff[SHA256_HASH_SIZE + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE + strlen("REQUEST") + 1] * 256
+											+ receive_buff[SHA256_HASH_SIZE + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE + strlen("REQUEST")];
+//				memcpy(&message_size, receive_buff + SHA256_HASH_SIZE + MESSAGE_LENGTH_HEADER_SIZE + MESSAGE_COMMAND_ID_SIZE + strlen("REQUEST"), sizeof(message_size));
 				RNGBigNumber(RANDOM_AUTHENTICATE_NUMBER_SIZE, random_authenticate_number);
 
 				//Send the random number first, so that GUI can calculate immediately
@@ -355,12 +357,10 @@ void RunUnsecuredSession(int accepted_conn)
 					temp_buff[1060],
 					cached_response[1060],
 					response_to_GUI[1060],
-					secret_random_concate[48],
 					session_encrypt_key[AES_KEY_SIZE_128],
 					session_old_encrypt_key[AES_KEY_SIZE_128],
 					session_encrypt_iv[AES_CTR_IV_SIZE],
 					session_backup_key[AES_KEY_SIZE_128],
-					random_authenticate_number[RANDOM_AUTHENTICATE_NUMBER_SIZE],
 					next_encrypt_key_hint[RANDOM_AUTHENTICATE_NUMBER_SIZE];
 	uint16_t 	received_command_length,
 						cached_response_length,

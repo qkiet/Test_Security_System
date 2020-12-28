@@ -338,12 +338,12 @@ void CreateHMAC_SHA256(uint8_t* message, uint16_t message_length, uint8_t* key, 
 void UpdateEncryptKey(uint8_t *secret_key, uint8_t *hint_number, uint8_t *encrypt_key)
 {
 	uint8_t temp_buff[SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE + RANDOM_AUTHENTICATE_NUMBER_SIZE];
-	SHA256_HASH sha256_digest;
+	MD5_HASH md5_digest;
 	memcpy(temp_buff, secret_key , SECRET_KEY_SIZE);
 	memcpy(temp_buff + SECRET_KEY_SIZE, encrypt_key, ENCRYPT_KEY_SIZE);
 	memcpy(temp_buff + SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE, hint_number, RANDOM_AUTHENTICATE_NUMBER_SIZE);
-	Sha256Calculate(temp_buff, SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE + RANDOM_AUTHENTICATE_NUMBER_SIZE, &sha256_digest);
-	memcpy(encrypt_key, sha256_digest.bytes, ENCRYPT_KEY_SIZE);
+	Md5Calculate(temp_buff, SECRET_KEY_SIZE + ENCRYPT_KEY_SIZE + RANDOM_AUTHENTICATE_NUMBER_SIZE, &md5_digest);
+	memcpy(encrypt_key, md5_digest.bytes, ENCRYPT_KEY_SIZE);
 }
 
 /**
